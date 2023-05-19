@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Cheating Detection System</title>
+    <link rel="stylesheet" href="Page_Design.css">
+	
+</head>
+<body>
+	<h1>Cheating Detection System</h1>
+	
+</body>
+</html>
+
+
+
+
+  
+<body>
+    <div class="button-container">
+		
+	
+	<button onclick="executePython()">Start</button>
+    <button onclick="openImage()">Images</button>
+</div>
+
+
+<script>
+
+    function executePython() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', 'http://localhost:8000/execute', true);
+        xhr.onload = function() {
+            if (xhr.status == 200) {
+                console.log('working');
+            }
+        };
+        xhr.send();
+    }
+    
+    function openImage() {
+    
+        var i;
+
+        for(i =1; i<4; i++)
+        window.open(`./exported_images/${i}.jpg`, '_blank');
+      }
+
+</script>
+	
+</body>
+
+
+</html>
+
+</html>

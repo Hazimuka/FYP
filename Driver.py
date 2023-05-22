@@ -5,14 +5,28 @@ import time as tm
 import matplotlib.pyplot as plt
 import os
 from gaze_tracking import GazeTracking
+import sys
+import shutil
 
 flag_debug = False
 start_time= 0
 end_time = 0
 gaze = GazeTracking()
+
+
+if os.path.exists('exported_images'):
+
+    shutil.rmtree('exported_images')
+
+
 webcam = cv2.VideoCapture(0)
+
+
+
+    
 if not os.path.exists('exported_images'):
     os.makedirs('exported_images')
+
 
 BODY_PARTS = { "Nose": 0, "Neck": 1, "RShoulder": 2, "RElbow": 3, "RWrist": 4,
                "LShoulder": 5, "LElbow": 6, "LWrist": 7, "RHip": 8, "RKnee": 9,

@@ -28,9 +28,11 @@ POSE_PAIRS = [ ["Neck", "RShoulder"], ["Neck", "LShoulder"], ["RShoulder", "RElb
 inWidth = 368
 inHeight = 368
 
-net = cv2.dnn.readNetFromTensorflow("graph_opt.pb")
-
-cap = cv2.VideoCapture(0)
+try:
+    net = cv2.dnn.readNetFromTensorflow("graph_opt.pb")
+except Exception as e:
+     print("**ERROR**\nAn error Occured while Opening graph_opt.pb")
+     exit()
 time_series=[]
 cheating = 0
 time = 0
@@ -39,15 +41,17 @@ flag_timer = False
 lapsed_flag=False
 while True:
         # We get a new frame from the webcam
-     _, frame = webcam.read()
+    _, frame = webcam.read()
     
-        # We send this frame to GazeTracking to analyze it
-     gaze.refresh(frame)
-    
-     frame = gaze.annotated_frame()
-     text = ""
-     eye_var = gaze.pupils_located
-     if eye_var == True:
+    try:
+        gaze.refresh(frame)
+    except Exception as e:
+        print("**ERROR**\nGaze Tracking has encounted a fatal Error")
+        exit()
+    frame = gaze.annotated_frame()
+    text = ""
+    eye_var = gaze.pupils_located
+    if eye_var == True:
         if gaze.is_center():#and not gaze.is_bottom() and not gaze.is_top():
             if gaze.is_top():
                 text = "Looking Top"
@@ -71,70 +75,72 @@ while True:
                 text = "Looking Right"
         elif gaze.is_left():
                 text = "Looking Left"
-     else:
-        text = "ERR:Not Detected~!"
+    else:
+        text = "**ERROR** EYES NOT VISIBLE!"
         
        
         
-     if flag_debug:
-         cv2.putText(frame, text, (90,60), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
-         #cv2.putText(frame, "Left pupil:  " + str(left_pupil), (10 ,130), cv2.FONT_HERSHEY_DUPLEX, 0.95, (255, 255, 255), 1)
-         #cv2.putText(frame ,"Right pupil: " + str(right_pupil), (10 ,165), cv2.FONT_HERSHEY_DUPLEX, 0.95, (255, 255, 255), 1)
-     left_pupil = gaze.pupil_left_coords()
-     right_pupil = gaze.pupil_right_coords()
-     vert_ratio = gaze.vertical_ratio()
-     horz_ratio = gaze.horizontal_ratio()
-     #cv2.putText(frame, "Left pupil:  " + str(left_pupil), (10 ,130), cv2.FONT_HERSHEY_DUPLEX, 0.95, (255, 255, 255), 1)
-     #cv2.putText(frame ,"Right pupil: " + str(right_pupil), (10 ,165), cv2.FONT_HERSHEY_DUPLEX, 0.95, (255, 255, 255), 1)
-     if flag_debug:
+    if flag_debug:
+        cv2.putText(frame, text, (90,60), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
+    left_pupil = gaze.pupil_left_coords()
+    right_pupil = gaze.pupil_right_coords()
+    vert_ratio = gaze.vertical_ratio()
+    horz_ratio = gaze.horizontal_ratio()
+
+    if flag_debug:
          cv2.putText(frame ,"Vertical Ratio " + str(vert_ratio), (10 ,200), cv2.FONT_HERSHEY_DUPLEX, 0.95, (147,58,31), 1)
          cv2.putText(frame ,"Horizontal Ratio " + str(horz_ratio), (10, 235), cv2.FONT_HERSHEY_DUPLEX, 0.95, (147,58,31), 1)
-     #cv2.imshow("Tester 1 callibration", frame)
-     #########################################################
-     frameWidth = frame.shape[1]
-     frameHeight = frame.shape[0]
-    
-     net.setInput(cv2.dnn.blobFromImage(frame, 1.0, (inWidth, inHeight), (127.5, 127.5, 127.5), swapRB=True, crop=False))
-     out = net.forward()
-     out = out[:, :19, :, :]
-
-     assert(len(BODY_PARTS) == out.shape[1])
+    #########################################################
+    frameWidth = frame.shape[1]
+    frameHeight = frame.shape[0]
+    try:
+        net.setInput(cv2.dnn.blobFromImage(frame, 1.0, (inWidth, inHeight), (127.5, 127.5, 127.5), swapRB=True, crop=False))
+    except Exception as e:
+        print("**ERROR**\n Fatal Issue with mapping DNN to net variable")
+        exit()
+    out = net.forward()
+    out = out[:, :19, :, :]
+    try:
+        assert(len(BODY_PARTS) == out.shape[1])
      
-     points = []
-     for i in range(len(BODY_PARTS)):
-         # Slice heatmap of corresponging body's part.
-         heatMap = out[0, i, :, :]
-         _, conf, _, point = cv2.minMaxLoc(heatMap)
-         x = (frameWidth * point[0]) / out.shape[3]
-         y = (frameHeight * point[1]) / out.shape[2]
-         # Add a point if it's confidence is higher than threshold.
-         points.append((int(x), int(y)) if conf > 0.05 else None)
+        points = []
+        for i in range(len(BODY_PARTS)):
+            # Slice heatmap of corresponging body's part.
+            heatMap = out[0, i, :, :]
+            _, conf, _, point = cv2.minMaxLoc(heatMap)
+            x = (frameWidth * point[0]) / out.shape[3]
+            y = (frameHeight * point[1]) / out.shape[2]
+            # Add a point if it's confidence is higher than threshold.
+            points.append((int(x), int(y)) if conf > 0.05 else None)
 
-     for pair in POSE_PAIRS:
-         partFrom = pair[0]
-         partTo = pair[1]
-         assert(partFrom in BODY_PARTS)
-         assert(partTo in BODY_PARTS)
+        for pair in POSE_PAIRS:
+            partFrom = pair[0]
+            partTo = pair[1]
+            assert(partFrom in BODY_PARTS)
+            assert(partTo in BODY_PARTS)
 
-         idFrom = BODY_PARTS[partFrom]
-         idTo = BODY_PARTS[partTo]
+            idFrom = BODY_PARTS[partFrom]
+            idTo = BODY_PARTS[partTo]
 
-         if points[idFrom] and points[idTo] and flag_debug:
-             cv2.line(frame, points[idFrom], points[idTo], (0, 255, 0), 3)
-             cv2.ellipse(frame, points[idFrom], (3, 3), 0, 0, 360, (0, 0, 255), cv2.FILLED)
-             cv2.ellipse(frame, points[idTo], (3, 3), 0, 0, 360, (0, 0, 255), cv2.FILLED)
-     def angle_between_points(point1, point2):
-         if (point1 != None and point2 != None):
+            if points[idFrom] and points[idTo] and flag_debug:
+                cv2.line(frame, points[idFrom], points[idTo], (0, 255, 0), 3)
+                cv2.ellipse(frame, points[idFrom], (3, 3), 0, 0, 360, (0, 0, 255), cv2.FILLED)
+                cv2.ellipse(frame, points[idTo], (3, 3), 0, 0, 360, (0, 0, 255), cv2.FILLED)
+    except Exception as e:
+        print("**ERROR**\n Issues with asserting bodybody parts!")
+        exit()
+    def angle_between_points(point1, point2):
+        if (point1 != None and point2 != None):
             x1, y1 = point1
             x2, y2 = point2
             return math.degrees(math.atan2(y2 - y1, x2 - x1))
-         else:
+        else:
             return 0
-     t, _ = net.getPerfProfile()
-     if flag_debug:
+    t, _ = net.getPerfProfile()
+    if flag_debug:
          cv2.putText(frame, str(angle_between_points(points[5],points[6])), (90,120), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
-     behave= "Not started"
-     if (not gaze.pupils_located or points[2] == None or points[3] == None or points[5] == None or points[6] == None):
+    behave= "Not started"
+    if (not gaze.pupils_located or points[2] == None or points[3] == None or points[5] == None or points[6] == None):
         time_series.append(0)
         if(not gaze.pupils_located):
             behave = "Eyes not detected"
@@ -146,10 +152,20 @@ while True:
         start_time = 0
         flag_timer = False
         end_time = 0
-     elif (gaze.is_left() and not gaze.is_top() ) or (gaze.is_right() and not gaze.is_top() and time > 30):
-        
+
+    elif angle_between_points(points[2],points[3]) > 160 or angle_between_points(points[2],points[3])<90 or angle_between_points(points[5],points[6]) < 30 or angle_between_points(points[5],points[6]) > 90 and time >30:
         if lapsed_flag==True:
-           
+            cheating= cheating + 1
+            time_series.append(2)
+        start_time = 0
+        flag_timer = False
+        end_time = 0
+        behave = "Abnormal body"
+        filename = f"exported_images/{len(os.listdir('exported_images')) + 1}.jpg"
+        cv2.imwrite(filename, frame)
+
+    elif (gaze.is_left() and not gaze.is_top() ) or (gaze.is_right() and not gaze.is_top() and time > 30):
+        if lapsed_flag==True:
             cheating= cheating + 1
             time_series.append(2) 
         start_time = 0
@@ -158,20 +174,8 @@ while True:
         behave = "Abnormal eyes"
         filename = f"exported_images/{len(os.listdir('exported_images')) + 1}.jpg"
         cv2.imwrite(filename, frame)
-        
-       
-     elif angle_between_points(points[2],points[3]) > 160 or angle_between_points(points[2],points[3])<90 or angle_between_points(points[5],points[6]) < 30 or angle_between_points(points[5],points[6]) > 90 and time >30:
-        if lapsed_flag==True:
-            
-             cheating= cheating + 1
-             time_series.append(2)
-            
-        start_time = 0
-        end_time = 0
-        behave = "Abnormal body"
-        filename = f"exported_images/{len(os.listdir('exported_images')) + 1}.jpg"
-        cv2.imwrite(filename, frame)
-     else:
+
+    else:
         if flag_timer==False:
             start_time = tm.time()
             flag_timer = True
@@ -181,25 +185,27 @@ while True:
         if lapsed_flag==True:
             time_series.append(1)
             
-     end_time = tm.time()
+    end_time = tm.time()
 
-     if(flag_timer == False):
+    if(flag_timer == False):
         time_lapsed=0
-     else:
+    else:
         time_lapsed = end_time - start_time
      
-     if time_lapsed>5:
+    if time_lapsed>5:
         lapsed_flag=True
-     cv2.putText(frame, behave, (90,180), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
-     if flag_debug:
-         cv2.putText(frame,"Timer : " + str(time_lapsed%60), (90,300), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
-     cv2.imshow('OpenPose using OpenCV', frame)
-     key = cv2.waitKey(5)
-     if key == 27:
-         flag_debug = not flag_debug;
-     if key == 113:
+    cv2.putText(frame, behave, (90,180), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
+    if flag_debug:
+        cv2.putText(frame,"Timer : " + str(time_lapsed%60), (90,300), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
+    cv2.putText(frame,"Inference Time: {:.2f} ms".format(t * 1000.0 / cv2.getTickFrequency()), (90,350), cv2.FONT_HERSHEY_DUPLEX, 1.6, (147,58,31), 2)
+    cv2.imshow('OpenPose using OpenCV', frame)
+    key = cv2.waitKey(5)
+    if key == 27:
+        flag_debug = not flag_debug;
+    if key == 113:
         break
-     time = time + 1
+    time = time + 1
+    
 
 webcam.release()
 cv2.destroyAllWindows()
@@ -213,4 +219,3 @@ percent = cheating/time *100
 p_not_detected = not_detected/time *100
 print( "Cheating Percentage = " + str(percent))
 print("Not detected Percentage = " + str(p_not_detected))
-# print(flag_debug)
